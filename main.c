@@ -29,14 +29,14 @@ void setDirection(uint8_t val); //Sollte aus ISR aufrufbar sein, hier irrelevent
 uint16_t Adc_Convert( uint8_t i);
 uint16_t AdcToVolt (uint16_t CW);
 
-void encoderISR(void); //Funktion sollte in zwingend in ITCM-RAM (über AHB) @STM32H7
+void encoderISR(void); //Funktion sollte in zwingend in ITCM-RAM (Ã¼ber AHB) @STM32H7
 
 
 
 // Folgende Studierende haben den Versuch zusammen erstellt und abgegeben:
 char Namen[] = "Michael Boeckelen, Tim Gebhard";
 
-uint16_t RPM = 0; //Globale Variable für RPM
+uint16_t RPM = 0; //Globale Variable fÃ¼r RPM
 
 void main(void) {
     System_Init();
@@ -54,12 +54,15 @@ void main(void) {
     Pin_Init(ADC_CH1_IN_PIN, PIN_GPIO_IN);   //ADC_CH1_IN_PIN als Eingang
     Adc_Init();
 
-    Timer_InitPwm(TIMER_3A, 39999); //PWM für Motor, 20kHz
+    Timer_InitPwm(TIMER_3A, 39999); //PWM fÃ¼r Motor, 20kHz
     Pin_Init(PWM_MOTOR, PIN_TIMER_OUT);
 
     Timer_InitCapture(TIMER_2A);
     Pin_Init(ENCODER_A, PIN_TIMER_IN);
+    Isr_Register(TIMER_2A, encoderISR);
     Pin_Init(ENCODER_B, PIN_GPIO_IN);
+
+    Isr_EnableAll();
 
 
     uint16_t CWPoti, CWIL, CWIR;    //Variablen zum Zwischenspeichern von Werten
@@ -71,9 +74,9 @@ void main(void) {
         CWIL = Adc_Convert(ADC_MUX_IN_IL);
         CWIR = Adc_Convert(ADC_MUX_IN_IR);
 
-        DS = linearMap((int16_t)CWPoti, 0, 4095, -2048, 2047);//CWPoti [0;4095] auf das gewünschte Format mappen [-2048; 2047]
+        DS = linearMap((int16_t)CWPoti, 0, 4095, -2048, 2047);//CWPoti [0;4095] auf das gewÃ¼nschte Format mappen [-2048; 2047]
 
-        setDirection(DS < 0); //Implizite Umwandlung des boolschen Vergleichs, wenn DS < 0 soll der Motor rückwärts laufen, also vergleich positiv -> 1 wird übergeben
+        setDirection(DS < 0); //Implizite Umwandlung des boolschen Vergleichs, wenn DS < 0 soll der Motor rÃ¼ckwÃ¤rts laufen, also vergleich positiv -> 1 wird Ã¼bergeben
         linearMapToPWM(0, 2048, absolut16(DS), TIMER_3A); //PWM entsprechend setzen
 
 
@@ -100,7 +103,7 @@ void linearMapToPWM (uint16_t min, uint16_t max, uint16_t value, TIMER_TypeDef T
 
 int16_t linearMap (int16_t value, int16_t in_min, int16_t in_max, int16_t out_min, int16_t out_max){
 
-    return (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min; //Lineares Erweitern auf gewünschtes Format
+    return (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min; //Lineares Erweitern auf gewÃ¼nschtes Format
 
 }
 
@@ -112,7 +115,7 @@ uint16_t absolut16 (int16_t val){
 
 }
 
-void setDirection(uint8_t val){ //0: vorwärts, im Uhrzeigersinn, 1: rückwärts
+void setDirection(uint8_t val){ //0: vorwÃ¤rts, im Uhrzeigersinn, 1: rÃ¼ckwÃ¤rts
 
     Pin_SetOutput(DIR_0, val);
     Pin_SetOutput(DIR_1, !val); //eig. schlecht, in 2 monaten hab ich keine Ahnung mehr was ich hier mache
@@ -129,7 +132,7 @@ uint16_t Adc_Convert( uint8_t i){
 
     DelayUs(100);   //Warten bis Conversion vorbei
 
-    return Adc_GetResult(ADC_CH1); //ADC-Resultat zurückgeben
+    return Adc_GetResult(ADC_CH1); //ADC-Resultat zurÃ¼ckgeben
 
 }
 
@@ -141,8 +144,6 @@ uint16_t AdcToVolt (uint16_t CW){ //Codewort zu Millivolt bzw. Milliampere (durc
 
 void encoderISR(void){
 
-    Timer_ClearCaptureFlag(TIMER_2A);
-
     static uint32_t CO = 0;
     uint32_t CN = Timer_GetCaptureValue(TIMER_2A), N;
 
@@ -151,6 +152,11 @@ void encoderISR(void){
     RPM = (int32_t) 240000000 / N; //80MHz * 60 / 2N
 
     if(Pin_GetInput(ENCODER_B)) RPM = -RPM;
+
+    CO = CN;
+    Timer_ClearCaptureFlag(TIMER_2A);
+
+
     return;
 
 }
