@@ -54,16 +54,18 @@ void main(void) {
     Pin_Init(ADC_CH1_IN_PIN, PIN_GPIO_IN);   //ADC_CH1_IN_PIN als Eingang
     Adc_Init();
 
-    Timer_InitPwm(TIMER_3A, 39999); //PWM für Motor, 20kHz
+    Timer_InitPwm(TIMER_3A, 3999); //PWM für Motor, 20kHz
     Pin_Init(PWM_MOTOR, PIN_TIMER_OUT);
 
     Timer_InitCapture(TIMER_2A);
     Pin_Init(ENCODER_A, PIN_TIMER_IN);
-    Isr_Register(TIMER_2A, encoderISR);
+    Timer_EnableCaptureIrq(TIMER_2A);
+    Isr_Register(IRQ_TIMER_2A, encoderISR);
     Pin_Init(ENCODER_B, PIN_GPIO_IN);
 
     Isr_EnableAll();
 
+    Uart_Init(UART_0, 115200);
 
     uint16_t CWPoti, CWIL, CWIR;    //Variablen zum Zwischenspeichern von Werten
     int16_t  DS;
@@ -86,7 +88,7 @@ void main(void) {
         Display_Printf(3, 0, "IR: %05d", AdcToVolt(CWIR));
         Display_Printf(4, 0, "n: %05d", RPM);
 
-
+        printf("%d\r\n", DS);
         Display_Update();
 
     }
@@ -94,7 +96,7 @@ void main(void) {
 
 void linearMapToPWM (uint16_t min, uint16_t max, uint16_t value, TIMER_TypeDef Timer){
 
-    uint16_t P = (value-min)*40000 / (max-min); //Linear mapping auf PWM-Bereich TODO: Checken ob nicht noch +1 bei MaxValue, evtl falsch implementiert
+    uint16_t P = (value-min)*4000 / (max-min); //Linear mapping auf PWM-Bereich TODO:Timer-Max aus struct holen
 
     Timer_SetPwmValue(Timer, P);
 
@@ -138,7 +140,8 @@ uint16_t Adc_Convert( uint8_t i){
 
 uint16_t AdcToVolt (uint16_t CW){ //Codewort zu Millivolt bzw. Milliampere (durch Shunt und Gain 1:1)
 
-    return (CW*3256)/(1<<12); //3256 entspricht Vref in mV
+    //return (CW*3256)/(1<<12); //3256 entspricht Vref in mV
+    return (CW*7951)/10000; //Selbiges
 
 }
 
@@ -147,7 +150,7 @@ void encoderISR(void){
     static uint32_t CO = 0;
     uint32_t CN = Timer_GetCaptureValue(TIMER_2A), N;
 
-    CN > CO ? (N = CN - CO) : (N = (1<<24)-CO+CN); //Overflow? TODO: So schreiben dass man das in 2 Monaten immer noch versteht
+    CN > CO ? (N = CN - CO) : (N = (1<<24)-CO+CN); //Overflow?
 
     RPM = (int32_t) 240000000 / N; //80MHz * 60 / 2N
 
