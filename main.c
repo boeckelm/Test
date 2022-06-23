@@ -15,6 +15,7 @@
 #define DIR_0 26
 #define DIR_1 27
 #define PWM_MOTOR 10
+#define PWM_MAX 4000
 
 
 #define ENCODER_A 22
@@ -44,7 +45,7 @@ void main(void) {
 
     Pin_Init(DIR_0, PIN_GPIO_OUT); //LED D1 bis D4 als Ausgang
     Pin_Init(DIR_1, PIN_GPIO_OUT);
-    Pin_SetOutput(DIR_0, 1); //Am Anfang lieber mal ausschalten bevor undefine state auftritt
+    Pin_SetOutput(DIR_0, 1); //Am Anfang lieber mal ausschalten bevor undefined state auftritt
     Pin_SetOutput(DIR_1, 1);
 
 
@@ -54,7 +55,7 @@ void main(void) {
     Pin_Init(ADC_CH1_IN_PIN, PIN_GPIO_IN);   //ADC_CH1_IN_PIN als Eingang
     Adc_Init();
 
-    Timer_InitPwm(TIMER_3A, 3999); //PWM für Motor, 20kHz
+    Timer_InitPwm(TIMER_3A, PWM_MAX-1); //PWM für Motor, 20kHz
     Pin_Init(PWM_MOTOR, PIN_TIMER_OUT);
 
     Timer_InitCapture(TIMER_2A);
@@ -88,7 +89,7 @@ void main(void) {
         Display_Printf(3, 0, "IR: %05d", AdcToVolt(CWIR));
         Display_Printf(4, 0, "n: %05d", RPM);
 
-        printf("%d\r\n", DS);
+        printf("%d,%d\r\n", DS, RPM);
         Display_Update();
 
     }
@@ -96,7 +97,7 @@ void main(void) {
 
 void linearMapToPWM (uint16_t min, uint16_t max, uint16_t value, TIMER_TypeDef Timer){
 
-    uint16_t P = (value-min)*4000 / (max-min); //Linear mapping auf PWM-Bereich TODO:Timer-Max aus struct holen
+    uint16_t P = (value-min)*PWM_MAX / (max-min); //Linear mapping auf PWM-Bereich TODO:Timer-Max aus struct holen
 
     Timer_SetPwmValue(Timer, P);
 
