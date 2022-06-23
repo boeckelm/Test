@@ -121,7 +121,7 @@ uint16_t absolut16 (int16_t val){
 void setDirection(uint8_t val){ //0: vorwärts, im Uhrzeigersinn, 1: rückwärts
 
     Pin_SetOutput(DIR_0, val);
-    Pin_SetOutput(DIR_1, !val); //eig. schlecht, in 2 monaten hab ich keine Ahnung mehr was ich hier mache
+    Pin_SetOutput(DIR_1, !val); //TODO: verbessern, evtl. direkt über Register toggeln und 0-0 State verhindern
     return;
 
 }
