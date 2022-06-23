@@ -36,7 +36,7 @@ void encoderISR(void); //Funktion sollte in zwingend in ITCM-RAM (über AHB) @ST
 // Folgende Studierende haben den Versuch zusammen erstellt und abgegeben:
 char Namen[] = "Michael Boeckelen, Tim Gebhard";
 
-uint16_t RPM = 0; //Globale Variable für RPM
+int16_t RPM = 0; //Globale Variable für RPM
 
 void main(void) {
     System_Init();
@@ -152,7 +152,7 @@ void encoderISR(void){
 
     CN > CO ? (N = CN - CO) : (N = (1<<24)-CO+CN); //Overflow?
 
-    RPM = (int32_t) 240000000 / N; //80MHz * 60 / 2N
+    RPM = (int32_t) 1600000000 / N; //80MHz * 60 / 2N
 
     if(Pin_GetInput(ENCODER_B)) RPM = -RPM;
 
