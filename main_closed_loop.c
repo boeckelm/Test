@@ -31,20 +31,20 @@ uint16_t absolut16 (int16_t val);
 void linearMapToPWM (uint16_t min, uint16_t max, uint16_t value, TIMER_TypeDef Timer);
 int16_t linearMap (int16_t value, int16_t in_min, int16_t in_max, int16_t out_min, int16_t out_max);
 void setDirection(uint8_t val); //Sollte aus ISR aufrufbar sein, hier irrelevent
-int16_t Limit (int16_t value, int16_t min, int16_t max);
+int32_t Limit (int16_t value, int16_t min, int16_t max);
 
 uint16_t Adc_Convert( uint8_t i);
 uint16_t AdcToVolt (uint16_t CW);
 int16_t PiRegler( int16_t nsoll, int16_t nist );
 
-void encoderISR(void); //Funktion sollte in zwingend in ITCM-RAM (über AHB) @STM32H7
+void encoderISR(void); //Funktion sollte in zwingend in ITCM-RAM (Ã¼ber AHB) @STM32H7
 void controlISR(void);
 
 
 // Folgende Studierende haben den Versuch zusammen erstellt und abgegeben:
 char Namen[] = "Michael Boeckelen, Tim Gebhard";
 
-uint16_t RPM = 0, NSOLL = 0; //Globale Variable für RPM
+int16_t RPM = 0, NSOLL = 0; //Globale Variable fÃ¼r RPM
 int32_t esum = 0;  // globale Variable, Summe des Regelfehlers
 
 
@@ -64,12 +64,14 @@ void main(void) {
     Pin_Init(ADC_CH1_IN_PIN, PIN_GPIO_IN);   //ADC_CH1_IN_PIN als Eingang
     Adc_Init();
 
-    Timer_InitPwm(TIMER_3A, 3999); //PWM für Motor, 20kHz
+    Timer_InitPwm(TIMER_3A, 3999); //PWM fÃ¼r Motor, 20kHz
     Pin_Init(PWM_MOTOR, PIN_TIMER_OUT);
 
-    Timer_InitPwm(TIMER_1A, 7999999); //Regler-Interrupt, 100Hz, M = 799.999
-    Isr_Register(IRQ_TIMER_1A, controlISR);
+    Timer_Init(TIMER_1A, 799999); //Regler-Interrupt, 100Hz, M = 799.999
     Timer_EnableOverflowIrq(TIMER_1A);
+    Timer_Start(TIMER_1A);
+    Isr_Register(IRQ_TIMER_1A, controlISR);
+
 
     Timer_InitCapture(TIMER_2A);
     Pin_Init(ENCODER_A, PIN_TIMER_IN);
@@ -90,15 +92,16 @@ void main(void) {
         CWIL = Adc_Convert(ADC_MUX_IN_IL);
         CWIR = Adc_Convert(ADC_MUX_IN_IR);
 
-        NSOLL = linearMap((int16_t)CWPoti, 0, 4095, 0, 6000);//CWPoti [0;4095] auf das gewünschte Format mappen [0; 6000]
+        NSOLL = linearMap((int16_t)CWPoti, 0, 4095, -6000, 6000);//CWPoti [0;4095] auf das gewÃ¼nschte Format mappen [0; 6000]
 
-        Display_Printf(0, 0, "CWPoti %05d", CWPoti);
+        Display_Printf(0, 0, "CWPoti %04d", CWPoti);
         Display_Printf(1, 0, "nsoll: %05d", NSOLL);
         Display_Printf(2, 0, "IL: %05d", AdcToVolt(CWIL));
         Display_Printf(3, 0, "IR: %05d", AdcToVolt(CWIR));
         Display_Printf(4, 0, "nist: %05d", RPM);
 
-        printf("%d\r\n", RPM);
+        printf("%d,%d,%d,%d\r\n", NSOLL,RPM,AdcToVolt(CWIL),AdcToVolt(CWIR));
+        DelayMs(100);
         Display_Update();
 
     }
@@ -115,7 +118,7 @@ void linearMapToPWM (uint16_t min, uint16_t max, uint16_t value, TIMER_TypeDef T
 
 int16_t linearMap (int16_t value, int16_t in_min, int16_t in_max, int16_t out_min, int16_t out_max){
 
-    return (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min; //Lineares Erweitern auf gewünschtes Format
+    return (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min; //Lineares Erweitern auf gewÃ¼nschtes Format
 
 }
 
@@ -127,7 +130,7 @@ uint16_t absolut16 (int16_t val){
 
 }
 
-void setDirection(uint8_t val){ //0: vorwärts, im Uhrzeigersinn, 1: rückwärts
+void setDirection(uint8_t val){ //0: vorwÃ¤rts, im Uhrzeigersinn, 1: rÃ¼ckwÃ¤rts
 
     Pin_SetOutput(DIR_0, val);
     Pin_SetOutput(DIR_1, !val); //eig. schlecht, in 2 monaten hab ich keine Ahnung mehr was ich hier mache
@@ -144,7 +147,7 @@ uint16_t Adc_Convert( uint8_t i){
 
     DelayUs(100);   //Warten bis Conversion vorbei
 
-    return Adc_GetResult(ADC_CH1); //ADC-Resultat zurückgeben
+    return Adc_GetResult(ADC_CH1); //ADC-Resultat zurÃ¼ckgeben
 
 }
 
@@ -162,7 +165,7 @@ void encoderISR(void){
 
     CN > CO ? (N = CN - CO) : (N = (1<<24)-CO+CN); //Overflow?
 
-    RPM = (int32_t) 240000000 / N; //80MHz * 60 / 2N
+    RPM = (int32_t) 1600000000 / N; //80MHz * 60 / 2N
 
     if(Pin_GetInput(ENCODER_B)) RPM = -RPM;
 
@@ -189,15 +192,15 @@ int16_t PiRegler( int16_t nsoll, int16_t nist ) {
     int16_t e, y;
     e = nsoll - nist;
     esum += e;
-    e = Limit(e, -2000, 2000);
+    e = Limit(e, -4000*SCALE/(KI*TA), 4000*SCALE/(KI*TA));
 
     y = ((int32_t)e*KP + esum*KI*TA)/SCALE; // Zeitdiskreter PI-Regler
 
 
-    return Limit(y, -4000, 4000);// Begrenzung fuer y
+    return Limit(y, -4000, 4000 );// Begrenzung fuer y
 }
 
-int16_t Limit (int16_t value, int16_t min, int16_t max){
+int32_t Limit (int16_t value, int16_t min, int16_t max){
 
     if(value < min) return min;
     else if(value > max) return max;
